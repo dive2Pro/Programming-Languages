@@ -70,4 +70,7 @@ val ne = {
     name="123"
 };
 (*  Record *)
-val { name } =ne
+val { name } =ne;
+
+
+
