@@ -90,6 +90,7 @@ fun card_value (c: card) =
     | (_, Ace) => 11
     | (_, _) => 10;
 
+
 val c : card = (Spades, Num(2));
 card_color(c) = Black;
 card_value c = 2;
@@ -170,13 +171,131 @@ fun officiate (cs : card list, ms: move list, goal: int ) =
                          val new_held_cards = c :: held_cards
                          val sum = sum_cards(new_held_cards)
                      in
-                                  if sum >= goal
+                                  if sum > goal
                                   then score(new_held_cards, goal)
                                   else aux_states(cs', ms', new_held_cards)
                      end
                 )
               | Discard dc =>
                 aux_states(cs, ms', remove_card(held_cards, dc,  IllegalMove))
-in
+  in
     aux_states(cs, ms,[])
-end
+  end;
+
+
+(* Challenge Problems *)
+fun cal_ace_count (cs) =
+  case cs of
+      [] => 0
+    | c :: cs' =>
+      case c of
+          Ace => 1 + cal_ace_count(cs')
+        | _ => cal_ace_count(cs');
+
+fun card_value2 ( c: card ) =
+  case c of
+      (_ , Num i) => i
+    | (_, Ace) => 1
+    | (_, _) => 10;
+fun sum_cards2 (cs: card list) =
+  let fun aux_sum (cs: card list, acc) =
+        case cs of
+            [] => acc
+          | c::cs' => aux_sum(cs', card_value(c) + acc)
+      fun aux_sum2 (cs: card list, acc) =
+        case cs of
+            [] => acc
+          | c::cs' => aux_sum(cs', card_value2(c) + acc)
+
+      val sum_max = aux_sum(cs, 0)
+      val sum_min = aux_sum2(cs, 0)
+  in
+      (sum_max, sum_min)
+  end;
+(* ace can have a value of 1 or 11 *)
+
+fun officiate_challenge (cs : card list, ms: move list, goal: int ) =
+  let
+      fun aux_states ( cs: card list , ms: move list , held_cards : card list) =
+        case ms of
+            [] => score(held_cards, goal)
+          | m :: ms' =>
+            case m of
+                Draw =>
+                (* pop cs *)
+                (case cs of
+                     [] => score(held_cards, goal)
+                   | c :: cs' =>
+                     let
+                         val new_held_cards = c :: held_cards
+                         val sum = sum_cards(new_held_cards) ;
+                     in
+                         if sum > goal
+                         then score(new_held_cards, goal)
+                         else aux_states(cs', ms', new_held_cards)
+                     end
+                )
+              | Discard dc =>
+                aux_states(cs, ms', remove_card(held_cards, dc,  IllegalMove))
+  in
+      aux_states(cs, ms,[])
+  end;
+
+(* always return the least (i.e., best) possible score *)
+(* ace can have a value of 1 or 11 *)
+
+fun score_challenge (cs : card list, goal: int) =
+  (* if sum is greater than goal, the preliminary score is three(sum - goal) *)
+  let
+      val (sum_max , sum_min) = sum_cards2(cs);
+      fun cal_score (sum) =
+        if sum > goal
+        then 3 * ( sum - goal)
+      (* else the preliminary score is (goal - sum)*)
+        else goal - sum;
+      val preliminary_score = Int.min(cal_score(sum_max), cal_score(sum_min));
+     (* score is the preliminary score unless all the held-cards are the same color *)
+      val is_cards_all_same_color = all_same_color(cs)
+                                                  (* in which case the score is the preliminary score divided by 2*)
+  in
+      if is_cards_all_same_color
+      then
+          preliminary_score div 2
+      else
+          preliminary_score
+  end;
+(* card list * int => move list*)
+fun careful_player (cs : card list, int goal) =
+  (*  *)
+  let  val score = score(cs, goal)
+       fun get_hold_cards (cs: card list, ms: move list, hold_cards': card list) =
+         case ms of
+             [] => hold_cards
+           | m :: ms' =>
+             case m of
+                 (Draw =>
+                  (case cs of
+                       [] => hold_cards
+                     | c :: cs' => get_hold_cards(cs', ms', c :: hold_cards')))
+               | Discard dc => get_hold_cards(cs, ms', remove_card(hold_cards', dc, IllegalMove));
+       (* The value of the held cards never exceeds the goal*)
+       fun make_move (ms: move list) =
+         (* A card is drawn whenever the goal is more than 10 *)
+         let val hcs = get_hold_cards(cs, ms, []);
+             val hcs_value = sum_cards(hcs);
+         (* greater than the value of the held cards *)
+         in
+             if goal > hcs_value
+                orelse  goal > 10
+             then Draw :: ms
+             else ms
+         end
+
+  (* As a detail, you should (attempt to ) draw , even if no cards ramain in the card-list *)
+
+  (* if a score of 0 is reached, there must be no more moves *)
+
+  (* if it is possible to reach a score of 0 by discarding a card folowed by drawing a card, then this must be done. *)
+
+  (* no more moves after a score of 0 is reached even if there is another way to get back to 0 *)
+
