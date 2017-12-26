@@ -221,3 +221,33 @@ fun match (v,p) =
     | (Tuple t, TupleP tp) => (all_answers match) (ListPair.zip (t, tp))
     | _ => NONE
 ;
+  (*
+  foo ->         -> 'b
+  f -> 'a list ->  'b
+  x -> int
+  y -> int
+  z -> 'a list
+  foo :
+      ('a list -> 'b list) -> int -> int -> 'a list -> 'b list
+  *)
+  fun foo f x y z =
+    if x >= y
+    then (f z)
+    else foo f y x (tl z);
+(*
+f : string -> int
+a : string
+b : string
+c : int
+d : int
+e : int
+baz : int * list
+Call: baz (fn z => 3)
+Return type :
+      string -> string -> int -> int -> int list -> int  list
+
+*)
+fun baz f a b c d e =
+  (f (a ^ b )) :: ( c + d ) :: e;
+
+  
