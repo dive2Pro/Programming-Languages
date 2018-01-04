@@ -48,7 +48,12 @@
 ;; lookup a variable in an environment
 ;; Do NOT change this function
 (define (envlookup env str)
-  (cond [(null? env) (error "unbound variable during evaluation" str)]
+  (cond [(null? env) (
+
+                      begin
+                       (print env )
+                       (print str)
+                       (error "unbound variable during evaluation" str))]
         [(equal? (car (car env)) str)
          (cdr (car env))]
         [#t (envlookup (cdr env) str)]))
@@ -153,7 +158,11 @@
     ;; if e1 and e2 are MUPL expressions, then (call e1 e2) is a MUPL expression (a function call)
 
     [(call? e)
-     (let ([c (call-funexp e)]
+     (let
+         ;; 这里 可以是返回一个 closure
+         ([c (eval-under-env (call-funexp e) env)]
+         ;  [c-r (eval-under-env (call-funexp e) env)]
+          ;; 这里就是他本身
            [p (eval-under-env (call-actual e) env)])
        
        (if (closure? c)
@@ -163,32 +172,61 @@
             ;; to the result of the second subexpression
             ;;  (struct closure (env fun) #:transparent)
             
-           (let* ([c-env (closure-env c)]
-                 [c-body (closure-fun c)]
-                 [c-body-param (fun-formal c-body)])
+           (
+            begin
+             (print "-=-=-=-= begin -=-=-=-=")
+             (print c)
+             (print (closure-fun c))
+             (let* ([c-env (closure-env c)]
+                    [c-body (closure-fun c)]
+                    [c-body-param (fun-formal c-body)]
+                    [eval-closure (lambda (clos _env)
+                                  (let ([ce (closure-env clos)]
+                                        [fn (closure-fun clos)])
+                                    
+                                    (begin
+                                      ;(print "____ eval-closure ____ ")
+                                      ;(print ce )
+                                      (print " --------_env---------")
+                                      (print _env)
+                                      (print " --------fn---------")
+                                      (print fn)
+                                      (print " ---- eval-closure-end --- ")
+                                      (print (eval-under-env fn (extendenv _env ce)))
+                                      (eval-under-env fn (extendenv _env ce )))))]
+                  [t-env (extendenv env (extendenv c-env (cons c-body-param p)))]
+                  )
              
              (begin
+               ;(print (fun-formal (closure-fun c-r)))
+               ;(print (closure-fun c-r))
+               (print " --- c-env ---")
                ;(print c-env)
+               (print " ---- c-body ---")
                ;(print c-body)
                ;(print c-body-param)
+               (print p)
                ;  (print (eval-under-env c-body
-               ;   (extendenv env (extendenv c-env (cons c-body-param p)))))
-               (eval-under-env
+               ; (extendenv env (extendenv c-env (cons c-body-param p)))))
+               (eval-closure
                 ;; closure produces a function that result from call fun
                 (eval-under-env c-body
-                                      
-                                (extendenv env (extendenv c-env (cons c-body-param p))))
-                env)))
+                                      ;; p 已经是在 closure 中 返回的 closure 是可以被定义的
+                                (begin
+                                  ;(print "_____ env _____")
+                                  ;(print (extendenv env (extendenv c-env (cons c-body-param p))))
+                                  t-env
+                                  )
+                                )
+                t-env))))
           ;; if the first is not a closure -> error
            (error "MUPL call first argument applied to non-closure")))]
     ;; A call evaluates its first and second subexpressions to values.
     
     ;;  closure (env fun)
     [(closure? e)
-     (let ([ce (closure-env e)]
-           [fn (closure-fun e)])
-       (eval-under-env fn (extendenv env ce)))]
-  
+     
+     e]
    
 
 
@@ -198,25 +236,32 @@
      (let
          ([v1 (eval-under-env (apair-e1 e) env)]
           [v2 (eval-under-env (apair-e2 e) env)])
-       (cons v1 v2))]
+       (apair v1 v2))
+     ]
         
          
     ;; struct fst  (e)
     [(fst? e)
      (let ([v (eval-under-env (fst-e e) env)])
-       (if (pair? v)
-           (car v)
+       (if (apair? v)
+           (apair-e1 v)
            (error "MUPL fst argument e resulting to non-pair")))]
     [(snd? e)
      (let ([v (eval-under-env (snd-e e) env)])
-       (if (pair? v)
-           (cdr v)
+       (if (apair? v)
+           (apair-e2 v)
            (error "MUPL snd argument e resulting to non-pair")))]
     [(isaunit? e)
      (let ([v (eval-under-env (isaunit-e e) env)])
        (if (aunit? v)
            (int 1)
            (int 0)))]
+    [(aunit? e)
+     (begin
+       (print "0-")
+       (print e)
+       (aunit))
+     ]
     [#t (error (format "bad MUPL expression: ~v" e))]))
 
 ;; Do NOT change
@@ -225,16 +270,82 @@
 ;(eval-exp (fun "zz" "x" (aunit)))
 
 ;; Problem 3
+;;   The Racket functions produce MUPL expressions that could then be put inside larger
+;;   MUPL expressions or passed to eval-exp
+(define (ifaunit e1 e2 e3)
+  ;; three MUPL expressions
+  ;; return a MUPL expression that when run evaluates e1 and if the result is MUPL's aunit
+  ;; then it evaluates e2 and that is the overall result
+  ;; Else it evaluates e3 and that is the overall result
+  (if (aunit?
+       e1 ) e2  e3))
 
-(define (ifaunit e1 e2 e3) "CHANGE")
+(define (mlet* lstlst e2)
+  ;; The bindings are done sequentially , so that each ei is evaluated in an environment
+  ;; where s1 through s(i-1) have been previously bound to the values e1 through e(i-1)
+  (if (null? lstlst)
+      (error "mlet* applied to  null list")
+      (letrec ([f (lambda (env ls)
+                 (if (null? ls)
+                     env
+                     (let* ([name (caar ls)]
+                           [mupl (cdar ls)]
+                           [value (eval-under-env mupl env)]
+                           )
+                       (f (extendenv env (cons name value)) (cdr ls))
+                       )))])
+        (eval-under-env e2 (f null lstlst)))
+      )
+  )
 
-(define (mlet* lstlst e2) "CHANGE")
-
-(define (ifeq e1 e2 e3 e4) "CHANGE")
+(define (ifeq e1 e2 e3 e4)
+  ;; e3 is evaluated if and only if e1 and e2 are equal integers.
+  ;; none of the arguments to ifeq use the MUPL variables _x or _y
+  ;; when an expression returned from ifeq is evaluated, e1 and e2 are evaluated exactly once each
+  (let ([v1 (eval-under-env e1 null)]
+        [v2 (eval-under-env e2 null)]
+        )
+    (if (and (int? v1) (int? v2))
+        (if (= (int-num v1) (int-num v2))
+            e3
+            e4)
+        (error "ifeq the first and second arguments result are non-int")
+  )))
 
 ;; Problem 4
 
-(define mupl-map "CHANGE")
+(define mupl-map
+  ;;(map (lambda (number) (+ 1 number) )
+  ;;      '(1 2 3 4 5))
+  ;; -> '(2 3 4 5 6)
+  ; (closure null (fun #f "_x" 
+  ;  (if (fun? fn)
+        
+  ;     (error "mupl-map applied to non-fun")
+
+  ;; acts like map
+
+  ;; should be curried
+
+  ;; take a MUPL function
+
+  ;; and return a MUPL function that takes a MUPL list and applies the function to every element
+
+  ;; of the list returning a new MUPL list
+
+  ;; mupl-map nedds to be a MUPL funcion which is curried
+  ;; meaning it takes one argument (probably called "f")
+  ;; and its body is itself another function that takes as argument the list.
+  (fun "_map" "_fn"
+       (fun "_map2" "fn"
+            (fun "_map3" "ls" 
+                 (fun "_map4" "_ls__"
+                      (var "_ls__")
+                      )
+            ))
+       )
+  )
+  
 
 (define mupl-mapAddN 
   (mlet "map" mupl-map
