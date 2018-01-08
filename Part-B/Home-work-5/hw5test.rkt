@@ -26,13 +26,18 @@
    (check-equal? (eval-exp (mlet "x" (int 1) (add (int 5) (var "x")))) (int 6) "mlet test")
    
    ;; call test
-  ; (check-equal? (eval-exp (call (closure '() (fun #f "x" (add (var "x") (int 7))))(int 1))) (int 8) "call test")
+   (check-equal? (eval-exp (call (closure '() (fun #f "x" (add (var "x") (int 7))))
+                                 (int 1)))
+                 (int 8)
+                 "call test")
+   ;; fst test
+   ; (check-equal? (eval-exp (fst (apair (int 1) (int 2)))) (int 1) "fst test")
    
    ;;snd test
    (check-equal? (eval-exp (snd (apair (int 1) (int 2)))) (int 2) "snd test")
    
    ;; isaunit test
-   ; (check-equal? (eval-exp (isaunit (closure '() (fun #f "x" (aunit))))) (int 0) "isaunit test")
+    (check-equal? (eval-exp (isaunit (closure '() (fun #f "x" (aunit))))) (int 0) "isaunit test")
 
    ;; problem 3 - - - - - - - - - - - - - -
    ;; ifaunit test
@@ -65,4 +70,4 @@
   )
 
 (require rackunit/text-ui)
-(run-tests tests)
+ (run-tests tests)
