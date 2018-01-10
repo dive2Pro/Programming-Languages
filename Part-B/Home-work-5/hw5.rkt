@@ -94,9 +94,7 @@
                      (int-num v2)))
            
              
-             (
-               
-               begin (print v1 ) (print v2 ) (error "MUPL addition applied to non-number"))))]
+             (error "MUPL addition applied to non-number")))]
 
     ;; CHANGE add more cases here
     [(int? e)
@@ -143,21 +141,17 @@
     ;; Functions are lexically scoped:
     ;; A function evaluates to a closure holding the function and the current environment.
     [(fun? e)
-      (closure env e)]
-    ;;;  (let ([s1 (fun-nameopt e)]
-    ;;;        [s2 (fun-formal e)]
-    ;;;        [body (fun-body e)])
-    ;;;    (if (or (string? s1) (equal? s1 #f))
-    ;;;        (if (string? s2)
-    ;;;            (closure (if s1
-    ;;;                         (extendenv env (cons s1 body))
-    ;;;                         env)
-    ;;;                     (begin 
-    ;;;                       ;;;  (print body)
-    ;;;                        e
-    ;;;                     ))
-    ;;;            (error "MUPL fun's second argument applied to non-string"))
-    ;;;        (error "MUPL fun's first argument applied neither string or #f")))]
+     (let ([s1 (fun-nameopt e)]
+           [s2 (fun-formal e)]
+           [body (fun-body e)])
+       (if (or (string? s1) (equal? s1 #f))
+           (if (string? s2)
+               (closure (if s1
+                            (extendenv env (cons s1 body))
+                            env)
+                        body)
+               (error "MUPL fun's second argument applied to non-string"))
+           (error "MUPL fun's first argument applied neither string or #f")))]
            
     
     ;; struct call (funexp actual) 
@@ -167,48 +161,79 @@
      (let
          ;; 这里 可以是返回一个 closure
          ([c (eval-under-env (call-funexp e) env)]
-          ;[c-r (eval-under-env (call-funexp e) env)]
-          ;; 这里就是传入的参数
+         ;  [c-r (eval-under-env (call-funexp e) env)]
+          ;; 这里就是他本身
            [p (eval-under-env (call-actual e) env)])
        
        (if (closure? c)
-          (let* ([c-fun (closure-fun c)]
-                 [c-env (closure-env c)]
-                 [fun-formal (fun-formal c-fun)]
-                 [fun-nameopt (fun-nameopt c-fun)]
-                 [fun-body (fun-body c-fun)]
-               )
-           (eval-under-env 
-           (begin 
-                  ;;; (print c-env)
-                  ;;; (print c-fun)
-                  ;;; (print fun-nameopt)
-                  ;;; (print fun-formal)
-                  ;;; (print p)
-                  fun-body ) 
-              ;;; Remember in closure there are not global params
-              ;;; So in the closure env , we just pass in the env that you pass by 
-              ;;;    second params
-             (if fun-nameopt 
-                   (begin (print 
-                                 (cons (cons fun-nameopt c)
-                ;;;  Must have a fun-formal
-                       (cons (cons fun-formal p) c-env)) 
-                    )
-                 (cons (cons fun-nameopt c)
-                ;;;  Must have a fun-formal
-                       (cons (cons fun-formal p) c-env)))
-                 (cons (cons fun-formal p) c-env)))
-          )
+            ;; it evaluates the closure's function's body in the closure's environment
+            ;; extended to map the function's name to the closure (unless the name field is #f)
+            ;; the function's argument-name (i.e., the parameter name)
+            ;; to the result of the second subexpression
+            ;;  (struct closure (env fun) #:transparent)
+            
+           (
+            begin
+             ;(print "-=-=-=-= begin -=-=-=-=")
+             ;(print c)
+             ;(print (closure-fun c))
+             (let* ([c-env (closure-env c)]
+                    [c-body (closure-fun c)]
+                    [c-body-param (fun-formal c-body)]
+                    [eval-closure (lambda (clos _env)
+                                  (let ([ce (closure-env clos)]
+                                        [fn (closure-fun clos)])
+                                    
+                                    (begin
+                                      ;(print "____ eval-closure ____ ")
+                                      ;(print ce )
+                                      ;(print " --------_env---------")
+                                      ;(print _env)
+                                      ;(print " --------fn---------")
+                                      ;(print fn)
+                                      ;(print " ---- eval-closure-end --- ")
+                                      (print (eval-under-env fn (extendenv _env ce)))
+                                      (eval-under-env fn (extendenv _env ce )))))]
+                  [t-env (extendenv env (extendenv c-env (cons c-body-param p)))]
+                  )
+             
+             (begin
+               ;(print (fun-formal (closure-fun c-r)))
+               ;(print (closure-fun c-r))
+               ;(print " --- c-env ---")
+               ;(print c-env)
+               ;(print " ---- c-body ---")
+               ;(print c-body)
+               ;(print c-body-param)
+               ;(print p)
+               ;  (print (eval-under-env c-body
+               ; (extendenv env (extendenv c-env (cons c-body-param p)))))
+               (eval-closure
+                ;; closure produces a function that result from call fun
+                (eval-under-env c-body
+                                      ;; p 已经是在 closure 中 返回的 closure 是可以被定义的
+                                (begin
+                                  ;(print "_____ env _____")
+                                  ;(print (extendenv env (extendenv c-env (cons c-body-param p))))
+                                  t-env
+                                  )
+                                )
+                env))))
           ;; if the first is not a closure -> error
            (error "MUPL call first argument applied to non-closure")))]
     ;; A call evaluates its first and second subexpressions to values.
     
     ;;  closure (env fun)
-    [(closure? e) e]
+    [(closure? e)
+     
+     e]
+   
+
+
+        
     ;; (struct apair (e1 e2)     #:transparent) ;; make a new pair
     [(apair? e)
-      (let
+     (let
          ([v1 (eval-under-env (apair-e1 e) env)]
           [v2 (eval-under-env (apair-e2 e) env)])
        (apair v1 v2))
@@ -220,15 +245,12 @@
      (let ([v (eval-under-env (fst-e e) env)])
        (if (apair? v)
            (apair-e1 v)
-           v))]
-
-          ;;;  (begin (print (fst-e e)) (print env) (error "MUPL fst argument e resulting to non-pair"))))]
+           (error "MUPL fst argument e resulting to non-pair")))]
     [(snd? e)
      (let ([v (eval-under-env (snd-e e) env)])
        (if (apair? v)
            (begin
-            ;;;  (print (apair-e2 v))
-            
+             (print v)
              (apair-e2 v)
              )
            (error "MUPL snd argument e resulting to non-pair")))]
@@ -237,7 +259,12 @@
        (if (aunit? v)
            (int 1)
            (int 0)))]
-    [(aunit? e) (aunit) ]
+    [(aunit? e)
+     (begin
+       (print "0-")
+       (print e)
+       (aunit))
+     ]
     [#t (error (format "bad MUPL expression: ~v" e))]))
 
 ;; Do NOT change
@@ -253,9 +280,9 @@
   ;; return a MUPL expression that when run evaluates e1 and if the result is MUPL's aunit
   ;; then it evaluates e2 and that is the overall result
   ;; Else it evaluates e3 and that is the overall result
-  (begin (print e1)
-   (ifgreater (isaunit e1 ) (int 0) e2  e3)
-))
+  (if (aunit?
+       e1 ) e2  e3))
+
 (define (mlet* lstlst e2)
   ;; The bindings are done sequentially , so that each  is evaluated in an environment
   ;; where s1 through s(i-1) have been previously bound to the values e1 through e(i-1)
@@ -296,7 +323,9 @@
   ;; -> '(2 3 4 5 6)
   ; (closure null (fun #f "_x" 
   ;  (if (fun? fn)
+        
   ;     (error "mupl-map applied to non-fun")
+
   ;; acts like map
 
   ;; should be curried
@@ -310,22 +339,45 @@
   ;; mupl-map nedds to be a MUPL funcion which is curried
   ;; meaning it takes one argument (probably called "f")
   ;; and its body is itself another function that takes as argument the list.
-       (fun #f "fn" ;; <-- eval-closure   call second params
-                (fun "mapfunc" "ls" ;; <-- call second params
-                    (ifaunit (var "ls")
-                          (aunit)
-                          (apair 
-                              (call (var "fn") 
-                                      (fst (var "ls")))
-                              (call (var "mapfunc") 
-                                      (snd (var "ls")))
-                            )
-                       )
-                       
-                    )               
+  (fun "_map" "_fn"
+       (fun "_map2" "fn"
+            (fun "_map3" "___ls" 
+                 (fun "_map4" "ls"
+                      (letrec ([fn (var "fn")]
+                             [ls (var "ls")]
+                             [itr (lambda (x)
+                                    (if (apair? x)
+                                        (apair (call fn (fst x)) (itr (snd x)))
+                                        (begin
+                                        
+                                          (print (mupllist->racketlist ls))
+                                          (mupllist->racketlist ls)
+                                   ))
+                                  )])
+                        
+                        (begin
+                          (print "++++++++")
+                          ;(print fn)
+                          ;(print (apair-e1 ls))
+                          fn
+                          ls
+                          (print (apair? ls))
+                          (print "---- ---- ----")
+                          ;(print (itr (mupllist->racketlist ls)))
+                          (print "++++++++")
+                          (mlet "itr2" fn
+                                (begin (print (var "itr2"))
+                                       (itr ls)
+                                )
+                                ))
+                        
+                          ;(fun #f "__" (itr (mupllist->racketlist ls )))
+                          )
+                      )
                  )
-            
-       )
+            )
+       ))
+      
   
 
 (define mupl-mapAddN 
