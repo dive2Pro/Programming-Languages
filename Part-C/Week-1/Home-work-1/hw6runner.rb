@@ -9,6 +9,7 @@ def runTetris
 end
 
 def runMyTetris
+  puts "Hello"
   MyTetris.new
   mainLoop
 end
