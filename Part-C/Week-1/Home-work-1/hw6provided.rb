@@ -76,6 +76,7 @@ class Piece
     Piece.new(All_Pieces.sample, board)
   end
 
+
   # class array holding all the pieces and their rotations
   All_Pieces = [
       [[[0, 0], [1, 0], [0, 1], [1, 1]]], # square (only needs one)
@@ -86,18 +87,14 @@ class Piece
       rotations([[0, 0], [0, -1], [0, 1], [-1, 1]]), # inverted L
       rotations([[0, 0], [-1, 0], [0, -1], [1, -1]]), # S
       rotations([[0, 0], [1, 0], [0, -1], [-1, -1]]),
-      rotations([[0, 0], [1, 0], [1, 1], [1, 0]]),
-      [[[0, 0], [-1, 0], [1, 0], [2, 0], [3, 0]], # long (only needs two)
-       [[0, 0], [0, -1], [0, 1], [0, 2], [0, 3]]],
-      rotations(
-          [[0, 0], [-1, 0], [1, 0], [0, 1], [-1, 1]]
-      )
+
   ] # Z
 
-  # class array 
+  # class array
   All_Colors = ['DarkGreen', 'dark blue', 'dark red', 'gold2', 'Purple3',
                 'OrangeRed2', 'LightSkyBlue']
 end
+
 
 
 # Class responsible for the interaction between the pieces and the game itself
